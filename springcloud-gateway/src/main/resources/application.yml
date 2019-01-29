@@ -1,0 +1,61 @@
+server:
+  port: 8666
+
+#全局默认filters:default-filters中 下面的先执行 所以 Retry在下面 Hystrix在上面 (即 先重试在断路)
+spring:
+  application:
+    name: gateway-server
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lowerCaseServiceId: true
+      routes:
+      - id: ingredients-fallback
+        uri: lb://SERVICE-HI
+        predicates:
+        - Path=/hi
+        filters:
+        - AddRequestHeader=md5, 213
+
+      default-filters:
+      - name: Hystrix
+        args:
+          name: fetchIngredientss
+          fallbackUri: forward:/fallback
+      - name: Retry
+        args:
+          retries: 3
+          statuses: BAD_GATEWAY
+    loadbalancer:
+      retry:
+        enabled: true
+hystrix:
+  command:
+    default:
+      execution:
+        isolation:
+          thread:
+            timeoutInMilliseconds: 5000
+#开启actuator管理api，后面要关闭
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+eureka:
+  client:
+    healthcheck:
+      enabled: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    # 每隔30s发送一次心跳
+    lease-renewal-interval-in-seconds: 30
+    # 告知服务端30秒还未收到心跳的话，就将该服务移除列表
+    lease-expiration-duration-in-seconds: 30
+
+logging:
+  level:
+    org.springframework.cloud.gateway: debug
